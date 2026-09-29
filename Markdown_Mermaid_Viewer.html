@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Markdown Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f6f5f1;
+    --paper-raised: #ffffff;
+    --ink: #1c1e1b;
+    --ink-soft: #55564f;
+    --ink-faint: #8b8c84;
+    --line: #dedcd2;
+    --line-strong: #c7c5b8;
+    --accent: #2f6f6d;
+    --accent-ink: #16403f;
+    --accent-soft: #e2eeec;
+    --danger: #a33d2f;
+    --danger-soft: #f6e6e2;
+    --radius: 10px;
+    --font-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --font-ui: "JetBrains Mono", "SF Mono", Consolas, monospace;
+  }
+
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --paper: #17181a;
+      --paper-raised: #1f2123;
+      --ink: #e9e8e2;
+      --ink-soft: #b1b0a6;
+      --ink-faint: #77776e;
+      --line: #33352f;
+      --line-strong: #45483f;
+      --accent: #5fb3ac;
+      --accent-ink: #cdece7;
+      --accent-soft: #223532;
+      --danger: #d98376;
+      --danger-soft: #3a2420;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #17181a;
+    --paper-raised: #1f2123;
+    --ink: #e9e8e2;
+    --ink-soft: #b1b0a6;
+    --ink-faint: #77776e;
+    --line: #33352f;
+    --line-strong: #45483f;
+    --accent: #5fb3ac;
+    --accent-ink: #cdece7;
+    --accent-soft: #223532;
+    --danger: #d98376;
+    --danger-soft: #3a2420;
+  }
+
+  * { box-sizing: border-box; }
+
+  /* body must grow with content (min-height only), otherwise the sticky
+     header's containing block ends after one screen and it scrolls away */
+  html { height: 100%; }
+  html, body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+  }
+
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+
+  body {
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+  }
+
+  header#topbar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 20;
+    transition: transform 0.22s ease;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+    padding: 0.7rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    font-family: var(--font-ui);
+  }
+
+  body.bar-hidden header#topbar {
+    transform: translateY(calc(-100% - env(safe-area-inset-top, 0px) - 2px));
+  }
+
+  .filename {
+    font-size: 12px;
+    color: var(--ink-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 220px;
+  }
+
+  .spacer { flex: 1 1 auto; }
+
+  #docSelect {
+    display: none;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink);
+    background: var(--paper-raised);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 0.35rem 0.5rem;
+    max-width: 280px;
+    min-width: 0;
+  }
+  body.folder-mode #docSelect { display: inline-block; }
+  #reloadBtn { display: none; }
+  body.has-doc #reloadBtn { display: inline-flex; }
+  body.folder-mode .filename { display: none; }
+
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    transform: translate(-50%, 20px);
+    z-index: 300;
+    max-width: min(92vw, 560px);
+    padding: 0.7rem 1rem;
+    border-radius: var(--radius);
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    line-height: 1.5;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  button.ui-btn {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink);
+    background: var(--paper-raised);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    line-height: 1;
+    transition: border-color 0.12s ease, background 0.12s ease;
+  }
+  button.ui-btn:hover { border-color: var(--accent); }
+  button.ui-btn:active { transform: translateY(1px); }
+  button.ui-btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--paper-raised);
+  }
+  button.ui-btn.icon-only { padding: 0.4rem 0.5rem; }
+
+  main {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+    padding: 2.25rem 1.25rem 4rem;
+  }
+
+  #content {
+    width: 100%;
+    max-width: 700px;
+    min-width: 0;
+  }
+
+  /* table of contents */
+  #tocBtn { display: none; }
+  body.has-toc #tocBtn { display: inline-flex; }
+  #toc {
+    display: none;
+    position: fixed;
+    left: 0;
+    top: var(--bar-h, 52px);
+    bottom: 0;
+    width: 270px;
+    z-index: 15;
+    overflow-y: auto;
+    padding: 1.6rem 1rem 2rem 1.25rem;
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    transition: top 0.22s ease, transform 0.22s ease;
+  }
+  body.bar-hidden #toc { top: 0; }
+  body.has-toc #toc { display: block; }
+  .toc-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    margin: 0 0 0.7rem 0.6rem;
+  }
+  #toc ol { list-style: none; margin: 0; padding: 0; }
+  #toc a {
+    display: block;
+    padding: 0.3rem 0.6rem;
+    border-left: 2px solid transparent;
+    color: var(--ink-soft);
+    text-decoration: none;
+    line-height: 1.4;
+    border-radius: 0 6px 6px 0;
+  }
+  #toc a:hover { color: var(--ink); background: var(--accent-soft); }
+  #toc a.active { color: var(--accent-ink); border-left-color: var(--accent); background: var(--accent-soft); }
+  #toc .lvl-2 a { padding-left: 1.3rem; }
+  #toc .lvl-3 a { padding-left: 2rem; font-size: 12px; }
+  #toc .lvl-4 a { padding-left: 2.7rem; font-size: 11.5px; }
+
+  @media (min-width: 1100px) {
+    body.has-toc:not(.toc-collapsed) main { padding-left: 290px; }
+    body.has-toc.toc-collapsed #toc { display: none; }
+  }
+  @media (max-width: 1099px) {
+    #toc {
+      background: var(--paper-raised);
+      border-right: 1px solid var(--line-strong);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+      width: min(84vw, 300px);
+      transform: translateX(-105%);
+    }
+    body.toc-open #toc { transform: none; }
+  }
+
+  /* empty state */
+  .empty-state {
+    margin-top: 3rem;
+    text-align: center;
+    color: var(--ink-soft);
+  }
+  .empty-state h1 {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 26px;
+    color: var(--ink);
+    margin: 0 0 0.6rem;
+  }
+  .empty-state p {
+    font-size: 15px;
+    line-height: 1.6;
+    max-width: 440px;
+    margin: 0 auto 1.5rem;
+  }
+  .empty-actions {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .empty-hint {
+    margin-top: 2rem;
+    font-family: var(--font-ui);
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+
+  /* rendered markdown typography */
+  #content h1, #content h2, #content h3, #content h4 {
+    scroll-margin-top: 76px;
+    font-weight: 600;
+    line-height: 1.28;
+    color: var(--ink);
+  }
+  #content h1 { font-size: 30px; margin: 0 0 0.9rem; }
+  #content h2 { font-size: 22px; margin: 2.2rem 0 0.8rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--line); }
+  #content h3 { font-size: 18px; margin: 1.8rem 0 0.6rem; }
+  #content h4 { font-size: 15.5px; margin: 1.4rem 0 0.5rem; }
+  #content p { line-height: 1.75; font-size: 16.5px; margin: 0 0 1.05rem; }
+  #content ul, #content ol { line-height: 1.75; font-size: 16.5px; padding-left: 1.4rem; margin: 0 0 1.05rem; }
+  #content li { margin-bottom: 0.3rem; }
+  #content a { color: var(--accent-ink); text-decoration-color: var(--accent); text-underline-offset: 2px; }
+  #content blockquote {
+    margin: 0 0 1.05rem;
+    padding: 0.2rem 1rem;
+    border-left: 3px solid var(--accent);
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+  #content hr { border: none; border-top: 1px solid var(--line); margin: 2rem 0; }
+  #content img { max-width: 100%; border-radius: 6px; }
+
+  #content code {
+    font-family: var(--font-ui);
+    font-size: 0.86em;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
+  pre.code-block {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 1.55;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0.9rem 1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre.code-block code { background: none; color: var(--ink); padding: 0; }
+
+  #content table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14.5px;
+    margin: 0 0 1.2rem;
+    display: block;
+    overflow-x: auto;
+  }
+  #content th, #content td {
+    border: 1px solid var(--line);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+  }
+  #content th {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ink-soft);
+    background: var(--paper-raised);
+  }
+
+  /* diagram cards */
+  .diagram-loading {
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    padding: 1.2rem;
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius);
+    margin: 0 0 1.2rem;
+  }
+
+  .diagram-card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--paper-raised);
+    margin: 0 0 1.2rem;
+    overflow: hidden;
+  }
+  .diagram-card.errored .diagram-viewport { display: none; }
+
+  .diagram-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-ui);
+    background: var(--paper);
+  }
+  .diagram-label {
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.02em;
+    margin-right: auto;
+  }
+  .diagram-actions { display: flex; align-items: center; gap: 0.3rem; }
+  .diagram-actions button {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--line-strong);
+    background: var(--paper-raised);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .diagram-actions button:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .diagram-actions button.wide { width: auto; padding: 0 0.55rem; font-size: 11px; }
+  .zoom-level {
+    font-size: 11px;
+    color: var(--ink-soft);
+    min-width: 38px;
+    text-align: center;
+  }
+
+  .diagram-viewport {
+    position: relative;
+    height: 320px;
+    overflow: hidden;
+    cursor: grab;
+    background:
+      linear-gradient(var(--paper-raised), var(--paper-raised)),
+      repeating-linear-gradient(0deg, var(--line) 0, var(--line) 1px, transparent 1px, transparent 22px),
+      repeating-linear-gradient(90deg, var(--line) 0, var(--line) 1px, transparent 1px, transparent 22px);
+    background-blend-mode: normal;
+    opacity: 1;
+  }
+  .diagram-viewport::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, var(--line) 0 1px, transparent 1px 22px),
+      repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px 22px);
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  .diagram-viewport.dragging { cursor: grabbing; }
+  .diagram-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    display: inline-block;
+  }
+  .diagram-canvas svg { display: block; max-width: none !important; }
+
+  /* fullscreen diagram (native API, or fixed-position fallback) */
+  .diagram-card:fullscreen,
+  .diagram-card.pseudo-fs {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+  }
+  .diagram-card:-webkit-full-screen { display: flex; flex-direction: column; width: 100%; height: 100%; margin: 0; }
+  .diagram-card.pseudo-fs { position: fixed; inset: 0; z-index: 100; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+  .diagram-card:fullscreen .diagram-viewport,
+  .diagram-card:-webkit-full-screen .diagram-viewport,
+  .diagram-card.pseudo-fs .diagram-viewport { flex: 1 1 auto; height: auto; }
+
+  /* popup (larger view, not fullscreen) */
+  #popupBackdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+    background: rgba(0,0,0,0.55);
+    display: none;
+  }
+  #popupBackdrop.open { display: block; }
+  .diagram-card.popup {
+    position: fixed;
+    z-index: 100;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(94vw, 1400px);
+    height: min(88vh, 1000px);
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    border-color: var(--line-strong);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .diagram-card.popup .diagram-viewport { flex: 1 1 auto; height: auto; }
+  .diagram-actions .popup-close { display: none; }
+  .diagram-card.popup .popup-close { display: inline-flex; }
+
+  .diagram-error {
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    color: var(--danger);
+    background: var(--danger-soft);
+    padding: 0.9rem 1rem;
+  }
+  .diagram-error pre {
+    white-space: pre-wrap;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    margin: 0.6rem 0 0;
+  }
+
+  /* drag overlay */
+  #dropOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 3px dashed var(--accent);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-ui);
+    font-size: 15px;
+    color: var(--accent-ink);
+    pointer-events: none;
+  }
+  #dropOverlay.active { display: flex; }
+
+  /* paste panel */
+  #pastePanel {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: rgba(0,0,0,0.4);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  #pastePanel.open { display: flex; }
+  #pasteBody {
+    width: min(94vw, 720px);
+    height: min(80vh, 560px);
+    background: var(--paper-raised);
+    border-radius: 12px;
+    border: 1px solid var(--line-strong);
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    gap: 0.7rem;
+  }
+  #pasteBody h2 {
+    margin: 0;
+    font-size: 15px;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    color: var(--ink);
+  }
+  #pasteTextarea {
+    flex: 1 1 auto;
+    resize: none;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 0.8rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--line-strong);
+    background: var(--paper);
+    color: var(--ink);
+  }
+  #pasteBody .paste-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+  input[type="file"] { display: none; }
+
+  /* recent files & folders */
+  #recentBtn, #recentSection { display: none; }
+  body.has-recent #recentBtn { display: inline-flex; }
+  body.has-recent #recentSection { display: block; }
+  #recentSection {
+    margin: 2.4rem auto 0;
+    max-width: 520px;
+    text-align: left;
+  }
+  .recent-title {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    margin: 0 0 0.5rem 0.2rem;
+  }
+  ol.recent-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--paper-raised);
+    overflow: hidden;
+  }
+  #content ol.recent-list { padding: 0; margin: 0; font-size: inherit; line-height: normal; }
+  .recent-list li { display: flex; align-items: stretch; border-top: 1px solid var(--line); margin: 0; }
+  .recent-list li:first-child { border-top: none; }
+  .recent-open {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 0.6rem;
+    row-gap: 0.15rem;
+    align-items: baseline;
+    padding: 0.6rem 0.8rem;
+    border: none;
+    background: none;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    text-align: left;
+    cursor: pointer;
+  }
+  .recent-open:hover { background: var(--accent-soft); }
+  .recent-kind {
+    grid-row: span 2;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    border-radius: 4px;
+    padding: 0.15rem 0.35rem;
+    align-self: center;
+    min-width: 46px;
+    text-align: center;
+  }
+  .recent-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recent-meta { font-size: 11px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recent-remove {
+    flex: 0 0 auto;
+    width: 36px;
+    border: none;
+    background: none;
+    color: var(--ink-faint);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .recent-remove:hover { color: var(--danger); background: var(--danger-soft); }
+  .recent-footer { display: flex; justify-content: flex-end; margin-top: 0.4rem; }
+  .recent-clear {
+    border: none;
+    background: none;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ink-faint);
+    cursor: pointer;
+    padding: 0.2rem 0.3rem;
+  }
+  .recent-clear:hover { color: var(--danger); }
+
+  #recentMenu {
+    display: none;
+    position: fixed;
+    top: calc(var(--bar-h, 52px) + env(safe-area-inset-top, 0px) + 6px);
+    right: 16px;
+    width: min(calc(100vw - 32px), 420px);
+    max-height: min(70vh, 520px);
+    overflow-y: auto;
+    z-index: 30;
+    padding: 0.8rem;
+    background: var(--paper);
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.18);
+  }
+  #recentMenu.open { display: block; }
+
+  @media (max-width: 640px) {
+    .filename { display: none; }
+    #docSelect { max-width: 150px; }
+    header#topbar { padding: 0.6rem 0.8rem; }
+    main { padding: 1.4rem 0.8rem 3rem; }
+    #content h1 { font-size: 25px; }
+    .diagram-viewport { height: 260px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="dropOverlay">drop a .md file or a folder to load it</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<header id="topbar">
+  <button class="ui-btn" id="tocBtn" aria-label="table of contents" title="table of contents">☰ contents</button>
+  <span class="filename" id="filenameLabel"></span>
+  <select id="docSelect" aria-label="document in folder" title="documents in the opened folder"></select>
+  <button class="ui-btn icon-only" id="reloadBtn" title="reload from disk" aria-label="reload from disk">↻</button>
+  <div class="spacer"></div>
+  <button class="ui-btn" id="recentBtn" aria-haspopup="true" aria-expanded="false" title="recently opened">recent ▾</button>
+  <button class="ui-btn" id="pasteBtn">paste text</button>
+  <button class="ui-btn" id="openFolderBtn" title="open a folder so relative links and images work">open folder</button>
+  <button class="ui-btn primary" id="openBtn">open file</button>
+  <button class="ui-btn icon-only" id="themeBtn" title="toggle theme" aria-label="toggle theme">◐</button>
+  <input type="file" id="fileInput" accept=".md,.markdown,.txt">
+  <input type="file" id="folderInput" webkitdirectory multiple>
+</header>
+
+<nav id="toc" aria-label="table of contents"></nav>
+
+<div id="recentMenu" role="dialog" aria-label="recently opened">
+  <div class="recent-title">recent</div>
+  <ol class="recent-list" id="recentMenuList"></ol>
+  <div class="recent-footer"><button class="recent-clear" id="recentClear">clear list</button></div>
+</div>
+
+<main>
+  <div id="content">
+    <div class="empty-state" id="emptyState">
+      <h1>Nothing loaded yet</h1>
+      <p>Open a markdown file or a whole folder (so relative links and images work), paste some text, or try the example — mermaid code blocks render as diagrams you can zoom and drag.</p>
+      <div class="empty-actions">
+        <button class="ui-btn primary" id="emptyOpenBtn">open file</button>
+        <button class="ui-btn" id="emptyFolderBtn">open folder</button>
+        <button class="ui-btn" id="emptyExampleBtn">load example</button>
+      </div>
+      <div id="recentSection">
+        <div class="recent-title">continue reading</div>
+        <ol class="recent-list" id="recentList"></ol>
+      </div>
+      <div class="empty-hint">ctrl + scroll to zoom a diagram · drag to pan · ⧉ popup · ⤢ full screen</div>
+    </div>
+  </div>
+</main>
+
+<div id="popupBackdrop"></div>
+
+<div id="pastePanel">
+  <div id="pasteBody">
+    <h2>paste markdown</h2>
+    <textarea id="pasteTextarea" placeholder="# heading&#10;&#10;```mermaid&#10;flowchart LR&#10;  a --> b&#10;```"></textarea>
+    <div class="paste-actions">
+      <button class="ui-btn" id="pasteCancel">cancel</button>
+      <button class="ui-btn primary" id="pasteRender">render</button>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var root = document.documentElement;
+  var content = document.getElementById("content");
+  var emptyState = document.getElementById("emptyState");
+  var filenameLabel = document.getElementById("filenameLabel");
+  var fileInput = document.getElementById("fileInput");
+  var dropOverlay = document.getElementById("dropOverlay");
+  var pastePanel = document.getElementById("pastePanel");
+  var pasteTextarea = document.getElementById("pasteTextarea");
+  var topbar = document.getElementById("topbar");
+  var toc = document.getElementById("toc");
+
+  var lastMarkdown = null;
+  var lastFilename = "";
+  var diagramCounter = 0;
+  var pendingDiagrams = {};
+  var diagramStates = {}; // id -> {scale, x, y, baseScale, homeEl}
+
+  // ---------- theme ----------
+  function storedTheme() {
+    try { return localStorage.getItem("md-viewer-theme"); } catch (e) { return null; }
+  }
+  var currentTheme = storedTheme() || "light";
+
+  function applyTheme(theme) {
+    currentTheme = theme;
+    root.setAttribute("data-theme", theme);
+    try { localStorage.setItem("md-viewer-theme", theme); } catch (e) {}
+    document.getElementById("themeBtn").textContent = theme === "dark" ? "☀" : "◐";
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: theme === "dark" ? "dark" : "default",
+      securityLevel: "loose",
+      fontFamily: "JetBrains Mono, monospace"
+    });
+    if (lastMarkdown !== null) {
+      var scrollY = window.scrollY;
+      renderMarkdown(lastMarkdown, lastFilename, true);
+      window.scrollTo(0, scrollY);
+    }
+  }
+  document.getElementById("themeBtn").addEventListener("click", function () {
+    applyTheme(currentTheme === "dark" ? "light" : "dark");
+  });
+
+  // ---------- markdown rendering ----------
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  var renderer = new marked.Renderer();
+  renderer.code = function (code, infostring) {
+    var lang = (infostring || "").trim().toLowerCase().split(/\s+/)[0];
+    if (lang === "mermaid") {
+      var id = "dg" + (diagramCounter++);
+      pendingDiagrams[id] = code;
+      return '<div class="mermaid-wrap" data-id="' + id + '"><div class="diagram-loading">rendering diagram…</div></div>';
+    }
+    return '<pre class="code-block"><code>' + escapeHtml(code) + "</code></pre>";
+  };
+  marked.setOptions({ renderer: renderer, gfm: true, breaks: false });
+
+  function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+  function applyTransform(id) {
+    var st = diagramStates[id];
+    if (!st) return;
+    st.canvasEl.style.transform = "translate(" + st.x + "px," + st.y + "px) scale(" + st.scale + ")";
+    st.zoomLabelEl.textContent = Math.round((st.scale / st.baseScale) * 100) + "%";
+  }
+
+  function setupZoomPan(id) {
+    var st = diagramStates[id];
+    var vp = st.viewportEl;
+
+    vp.addEventListener("wheel", function (e) {
+      // inline diagrams leave plain wheel to page scrolling; ctrl/cmd (or pinch) zooms
+      if (!isExpanded(st) && !e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      var rect = vp.getBoundingClientRect();
+      var mx = e.clientX - rect.left;
+      var my = e.clientY - rect.top;
+      var factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+      var newScale = clamp(st.scale * factor, st.baseScale * 0.25, st.baseScale * 8);
+      var cx = (mx - st.x) / st.scale;
+      var cy = (my - st.y) / st.scale;
+      st.x = mx - cx * newScale;
+      st.y = my - cy * newScale;
+      st.scale = newScale;
+      applyTransform(id);
+    }, { passive: false });
+
+    var dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
+    vp.addEventListener("pointerdown", function (e) {
+      dragging = true;
+      vp.classList.add("dragging");
+      startX = e.clientX; startY = e.clientY;
+      origX = st.x; origY = st.y;
+      vp.setPointerCapture(e.pointerId);
+    });
+    vp.addEventListener("pointermove", function (e) {
+      if (!dragging) return;
+      st.x = origX + (e.clientX - startX);
+      st.y = origY + (e.clientY - startY);
+      applyTransform(id);
+    });
+    function endDrag(e) {
+      dragging = false;
+      vp.classList.remove("dragging");
+    }
+    vp.addEventListener("pointerup", endDrag);
+    vp.addEventListener("pointercancel", endDrag);
+
+    st.cardEl.querySelectorAll("[data-action]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var action = btn.getAttribute("data-action");
+        var rect = vp.getBoundingClientRect();
+        var cx = rect.width / 2, cy = rect.height / 2;
+        if (action === "zoom-in" || action === "zoom-out") {
+          var factor = action === "zoom-in" ? 1.25 : 1 / 1.25;
+          var newScale = clamp(st.scale * factor, st.baseScale * 0.25, st.baseScale * 8);
+          var wx = (cx - st.x) / st.scale, wy = (cy - st.y) / st.scale;
+          st.x = cx - wx * newScale;
+          st.y = cy - wy * newScale;
+          st.scale = newScale;
+          applyTransform(id);
+        } else if (action === "reset") {
+          fitDiagram(id);
+        } else if (action === "popup") {
+          togglePopup(id);
+        } else if (action === "expand") {
+          if (popupId === id) closePopup();
+          toggleFullscreen(id);
+        }
+      });
+    });
+  }
+
+  var FIT_MARGIN = 16;
+  var MAX_UPSCALE = 2.5;
+
+  // fullscreen (native or pseudo) or popup: the diagram fits the whole box and plain wheel zooms
+  function isExpanded(st) {
+    var fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    return fsEl === st.cardEl || st.cardEl.classList.contains("pseudo-fs") || st.cardEl.classList.contains("popup");
+  }
+
+  // 100% = diagram fills the card width (inline), or fits entirely in the box (fullscreen / popup)
+  function fitDiagram(id) {
+    var st = diagramStates[id];
+    if (!st) return;
+    var vp = st.viewportEl;
+    var w = st.svgW, h = st.svgH, m = FIT_MARGIN, scale;
+    if (isExpanded(st)) {
+      vp.style.height = "";
+      var r = vp.getBoundingClientRect();
+      scale = Math.min((r.width - 2 * m) / w, (r.height - 2 * m) / h);
+      st.x = (r.width - w * scale) / 2;
+      st.y = (r.height - h * scale) / 2;
+    } else {
+      var vpW = vp.clientWidth;
+      scale = Math.min((vpW - 2 * m) / w, MAX_UPSCALE);
+      var natural = h * scale + 2 * m;
+      vp.style.height = Math.round(Math.min(natural, Math.max(260, window.innerHeight * 0.85))) + "px";
+      st.x = (vpW - w * scale) / 2;
+      st.y = m;
+    }
+    scale = Math.max(scale, 0.05);
+    st.baseScale = scale;
+    st.scale = scale;
+    st.fitWidth = vp.clientWidth;
+    applyTransform(id);
+  }
+
+  function toggleFullscreen(id) {
+    var st = diagramStates[id];
+    if (!st) return;
+    var card = st.cardEl;
+    var fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fsEl === card) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      return;
+    }
+    if (card.classList.contains("pseudo-fs")) {
+      exitPseudoFullscreen();
+      return;
+    }
+    var req = card.requestFullscreen || card.webkitRequestFullscreen;
+    if (req) {
+      Promise.resolve(req.call(card)).catch(function () { enterPseudoFullscreen(id); });
+    } else {
+      enterPseudoFullscreen(id);
+    }
+  }
+
+  var popupBackdrop = document.getElementById("popupBackdrop");
+  var popupId = null;
+  function togglePopup(id) {
+    if (popupId === id) { closePopup(); return; }
+    closePopup();
+    var st = diagramStates[id];
+    if (!st) return;
+    // keep the card's space in the document so the page doesn't jump
+    st.homeParent.style.minHeight = st.cardEl.offsetHeight + "px";
+    popupId = id;
+    st.cardEl.classList.add("popup");
+    popupBackdrop.classList.add("open");
+    document.body.style.overflow = "hidden";
+    requestAnimationFrame(function () { fitDiagram(id); });
+  }
+  function closePopup() {
+    if (popupId === null) return;
+    var id = popupId;
+    popupId = null;
+    popupBackdrop.classList.remove("open");
+    document.body.style.overflow = "";
+    var st = diagramStates[id];
+    if (!st) return;
+    st.cardEl.classList.remove("popup");
+    st.homeParent.style.minHeight = "";
+    requestAnimationFrame(function () { fitDiagram(id); });
+  }
+  popupBackdrop.addEventListener("click", closePopup);
+
+  // fallback for browsers without element fullscreen (e.g. iPhone Safari)
+  var pseudoFsId = null;
+  function enterPseudoFullscreen(id) {
+    pseudoFsId = id;
+    diagramStates[id].cardEl.classList.add("pseudo-fs");
+    document.body.style.overflow = "hidden";
+    requestAnimationFrame(function () { fitDiagram(id); });
+  }
+  function exitPseudoFullscreen() {
+    if (pseudoFsId === null) return;
+    var id = pseudoFsId;
+    pseudoFsId = null;
+    if (diagramStates[id]) diagramStates[id].cardEl.classList.remove("pseudo-fs");
+    document.body.style.overflow = "";
+    requestAnimationFrame(function () { fitDiagram(id); });
+  }
+
+  function onFullscreenChange() {
+    requestAnimationFrame(function () {
+      Object.keys(diagramStates).forEach(fitDiagram);
+    });
+  }
+  document.addEventListener("fullscreenchange", onFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+
+  var resizeTimer = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      Object.keys(diagramStates).forEach(function (id) {
+        var st = diagramStates[id];
+        if (isExpanded(st) || st.viewportEl.clientWidth !== st.fitWidth) fitDiagram(id);
+      });
+    }, 150);
+  });
+
+  function buildDiagramCard(id) {
+    var card = document.createElement("div");
+    card.className = "diagram-card";
+    card.innerHTML =
+      '<div class="diagram-toolbar">' +
+        '<span class="diagram-label">diagram</span>' +
+        '<div class="diagram-actions">' +
+          '<button data-action="zoom-out" aria-label="zoom out">−</button>' +
+          '<span class="zoom-level">100%</span>' +
+          '<button data-action="zoom-in" aria-label="zoom in">+</button>' +
+          '<button data-action="reset" class="wide">fit</button>' +
+          '<button data-action="popup" class="wide" aria-label="open in popup" title="open in popup">⧉</button>' +
+          '<button data-action="expand" class="wide" aria-label="full screen" title="full screen">⤢</button>' +
+          '<button data-action="popup" class="wide popup-close" aria-label="close popup" title="close popup">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="diagram-viewport"><div class="diagram-canvas"></div></div>';
+    return card;
+  }
+
+  function renderDiagram(id, code, wrapEl) {
+    var renderId = "svg-" + id + "-" + Math.random().toString(36).slice(2, 8);
+    return mermaid.render(renderId, code).then(function (result) {
+      var card = buildDiagramCard(id);
+      var canvasEl = card.querySelector(".diagram-canvas");
+      canvasEl.innerHTML = result.svg;
+      wrapEl.innerHTML = "";
+      wrapEl.appendChild(card);
+
+      // pin the svg to its intrinsic pixel size so scaling math is exact
+      var svg = canvasEl.querySelector("svg");
+      var vb = svg && svg.viewBox && svg.viewBox.baseVal;
+      var svgW = vb && vb.width, svgH = vb && vb.height;
+      if (!svgW || !svgH) {
+        try { var bb = svg.getBBox(); svgW = bb.width; svgH = bb.height; } catch (e) {}
+      }
+      svgW = svgW || 400; svgH = svgH || 300;
+      if (svg) {
+        svg.setAttribute("width", svgW);
+        svg.setAttribute("height", svgH);
+        svg.style.maxWidth = "none";
+      }
+
+      diagramStates[id] = {
+        svgW: svgW, svgH: svgH,
+        scale: 1, x: 0, y: 0, baseScale: 1,
+        cardEl: card,
+        viewportEl: card.querySelector(".diagram-viewport"),
+        canvasEl: canvasEl,
+        zoomLabelEl: card.querySelector(".zoom-level"),
+        homeParent: wrapEl
+      };
+      setupZoomPan(id);
+      fitDiagram(id);
+    }).catch(function (err) {
+      wrapEl.innerHTML =
+        '<div class="diagram-card errored"><div class="diagram-toolbar"><span class="diagram-label">diagram error</span></div>' +
+        '<div class="diagram-error">could not render this diagram.<pre>' + escapeHtml(err && err.message ? err.message : String(err)) + "</pre></div></div>";
+    });
+  }
+
+  function renderMarkdown(markdownText, filename, skipHistory) {
+    closePopup();
+    diagramCounter = 0;
+    pendingDiagrams = {};
+    diagramStates = {};
+
+    var html = marked.parse(markdownText);
+    content.innerHTML = html;
+    assignHeadingIds();
+    rewriteResources();
+    buildToc();
+
+    // wait for web fonts so mermaid measures label widths with the real font
+    var toRender = pendingDiagrams;
+    var fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+    var diagramsDone = fontsReady.then(function () {
+      var jobs = [];
+      content.querySelectorAll(".mermaid-wrap").forEach(function (wrapEl) {
+        var id = wrapEl.getAttribute("data-id");
+        var code = toRender[id];
+        if (code) jobs.push(renderDiagram(id, code, wrapEl));
+      });
+      return Promise.all(jobs);
+    });
+
+    if (!skipHistory) {
+      lastMarkdown = markdownText;
+      lastFilename = filename || "";
+    }
+    filenameLabel.textContent = filename || "";
+    filenameLabel.title = filename || "";
+    document.body.classList.add("has-doc");
+    return diagramsDone;
+  }
+
+  // ---------- table of contents ----------
+  var tocLinks = [];
+  var tocHeadings = [];
+
+  // same rules as GitHub's heading anchors, so [text](#some-heading) links written for GitHub work here
+  function slugify(text) {
+    return text.toLowerCase().trim()
+      .replace(/[^\p{L}\p{M}\p{N}\s_-]/gu, "")
+      .replace(/\s/g, "-") || "section";
+  }
+
+  function assignHeadingIds() {
+    var used = {};
+    content.querySelectorAll("h1, h2, h3, h4, h5, h6").forEach(function (h) {
+      var base = slugify(h.textContent), slug = base, n = 1;
+      while (used[slug]) slug = base + "-" + (n++);
+      used[slug] = true;
+      h.id = slug;
+    });
+  }
+
+  function buildToc() {
+    tocHeadings = Array.prototype.slice.call(content.querySelectorAll("h1, h2, h3, h4"));
+    tocLinks = [];
+    toc.innerHTML = "";
+    if (tocHeadings.length < 2) {
+      document.body.classList.remove("has-toc", "toc-open");
+      return;
+    }
+    var minLevel = Math.min.apply(null, tocHeadings.map(function (h) { return +h.tagName[1]; }));
+    var title = document.createElement("div");
+    title.className = "toc-title";
+    title.textContent = "contents";
+    var list = document.createElement("ol");
+    tocHeadings.forEach(function (h) {
+      var slug = h.id;
+      var li = document.createElement("li");
+      li.className = "lvl-" + (+h.tagName[1] - minLevel + 1);
+      var a = document.createElement("a");
+      a.href = "#" + slug;
+      a.textContent = h.textContent;
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        h.scrollIntoView({ behavior: "instant", block: "start" });
+        history.replaceState(null, "", "#" + slug);
+        document.body.classList.remove("toc-open");
+      });
+      li.appendChild(a);
+      list.appendChild(li);
+      tocLinks.push(a);
+    });
+    toc.appendChild(title);
+    toc.appendChild(list);
+    document.body.classList.add("has-toc");
+    updateActiveToc();
+  }
+
+  function updateActiveToc() {
+    if (!tocHeadings.length) return;
+    var active = 0;
+    for (var i = 0; i < tocHeadings.length; i++) {
+      if (tocHeadings[i].getBoundingClientRect().top <= 90) active = i; else break;
+    }
+    tocLinks.forEach(function (a, i) { a.classList.toggle("active", i === active); });
+  }
+
+  var wideQuery = window.matchMedia("(min-width: 1100px)");
+  document.getElementById("tocBtn").addEventListener("click", function () {
+    if (wideQuery.matches) {
+      document.body.classList.toggle("toc-collapsed");
+      Object.keys(diagramStates).forEach(fitDiagram);
+    } else {
+      document.body.classList.toggle("toc-open");
+    }
+  });
+  document.addEventListener("click", function (e) {
+    if (document.body.classList.contains("toc-open") && !toc.contains(e.target) && e.target.id !== "tocBtn") {
+      document.body.classList.remove("toc-open");
+    }
+  });
+
+  // ---------- top bar: hide on scroll down, show on scroll up ----------
+  var lastScrollY = window.scrollY;
+  function syncBarHeight() {
+    root.style.setProperty("--bar-h", topbar.offsetHeight + "px");
+  }
+  window.addEventListener("resize", syncBarHeight);
+  window.addEventListener("scroll", function () {
+    var y = window.scrollY;
+    var dy = y - lastScrollY;
+    if (y <= topbar.offsetHeight) {
+      document.body.classList.remove("bar-hidden");
+    } else if (dy > 4) {
+      document.body.classList.add("bar-hidden");
+    } else if (dy < -4) {
+      document.body.classList.remove("bar-hidden");
+    }
+    if (Math.abs(dy) > 4) lastScrollY = y;
+    updateActiveToc();
+  }, { passive: true });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      if (pseudoFsId !== null) exitPseudoFullscreen();
+      closePopup();
+      closeRecentMenu();
+      document.body.classList.remove("toc-open");
+      if (pastePanel.classList.contains("open")) pastePanel.classList.remove("open");
+    }
+  });
+
+  // ---------- links & folders ----------
+  // The browser never exposes a file's folder path, so relative links can only be resolved
+  // when the user opens (or drops) the whole folder: folderFiles maps "sub/dir/file.ext" -> File.
+  var folderFiles = null;
+  var folderLower = {};  // lower-cased path -> real path, for case-insensitive (Windows) lookups
+  var blobUrls = {};
+  var currentDocPath = "";
+  var docSelect = document.getElementById("docSelect");
+  var toastEl = document.getElementById("toast");
+  var toastTimer = null;
+  var MD_EXT = /\.(md|markdown|mdown|mkd)$/i;
+
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 4200);
+  }
+
+  function isExternal(href) {
+    return /^[a-z][a-z0-9+.-]*:/i.test(href) || href.indexOf("//") === 0;
+  }
+
+  function dirOf(path) {
+    var i = path.lastIndexOf("/");
+    return i === -1 ? "" : path.slice(0, i);
+  }
+
+  function resolvePath(baseDir, rel) {
+    try { rel = decodeURIComponent(rel); } catch (e) {}
+    rel = rel.replace(/\\/g, "/");
+    var parts = rel.charAt(0) === "/" ? [] : (baseDir ? baseDir.split("/") : []);
+    rel.split("/").forEach(function (seg) {
+      if (!seg || seg === ".") return;
+      if (seg === "..") parts.pop(); else parts.push(seg);
+    });
+    return parts.join("/");
+  }
+
+  function findInFolder(path) {
+    if (!folderFiles) return null;
+    if (folderFiles[path]) return path;
+    return folderLower[path.toLowerCase()] || null;
+  }
+
+  // folderFiles values are File snapshots or FileSystemFileHandles (which always read the latest version)
+  function getFolderFile(path) {
+    var v = folderFiles[path];
+    return v && v.getFile ? v.getFile() : Promise.resolve(v);
+  }
+
+  function blobUrlFor(path) {
+    if (blobUrls[path]) return Promise.resolve(blobUrls[path]);
+    return getFolderFile(path).then(function (f) {
+      blobUrls[path] = URL.createObjectURL(f);
+      return blobUrls[path];
+    });
+  }
+
+  function revokeBlobUrls() {
+    Object.keys(blobUrls).forEach(function (k) { URL.revokeObjectURL(blobUrls[k]); });
+    blobUrls = {};
+  }
+
+  function splitHref(href) {
+    var i = href.indexOf("#");
+    var pathPart = i === -1 ? href : href.slice(0, i);
+    var q = pathPart.indexOf("?");
+    if (q !== -1) pathPart = pathPart.slice(0, q);
+    return { path: pathPart, hash: i === -1 ? "" : href.slice(i + 1) };
+  }
+
+  function scrollToAnchor(hash) {
+    if (!hash) { window.scrollTo(0, 0); return true; }
+    var id = hash;
+    try { id = decodeURIComponent(hash); } catch (e) {}
+    var el = document.getElementById(id) || document.getElementById(id.toLowerCase());
+    if (!el || !content.contains(el)) return false;
+    el.scrollIntoView({ behavior: "instant", block: "start" });
+    return true;
+  }
+
+  // point relative <img src> at the opened folder's files; external links open in a new tab
+  function rewriteResources() {
+    content.querySelectorAll("img[src]").forEach(function (img) {
+      var src = img.getAttribute("src");
+      if (!src || isExternal(src) || src.charAt(0) === "#") return;
+      var found = findInFolder(resolvePath(dirOf(currentDocPath), splitHref(src).path));
+      if (found) blobUrlFor(found).then(function (url) { img.src = url; }, function () {});
+    });
+    content.querySelectorAll("a[href]").forEach(function (a) {
+      if (isExternal(a.getAttribute("href"))) {
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+      }
+    });
+  }
+
+  content.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("a[href]");
+    if (!a || !content.contains(a)) return;
+    var href = a.getAttribute("href");
+    if (!href || isExternal(href)) return;
+    e.preventDefault();
+    var parts = splitHref(href);
+    if (!parts.path) {
+      if (!scrollToAnchor(parts.hash)) toast("No heading \u201c#" + parts.hash + "\u201d in this document.");
+      return;
+    }
+    if (!folderFiles) {
+      toast("Browsers don\u2019t reveal a file\u2019s folder, so \u201c" + parts.path + "\u201d can\u2019t be found. Use \u201copen folder\u201d (or drop the folder) to follow relative links.");
+      return;
+    }
+    var target = resolvePath(dirOf(currentDocPath), parts.path);
+    var found = findInFolder(target);
+    if (!found) {
+      toast("Not found in the opened folder: " + target);
+    } else if (MD_EXT.test(found)) {
+      openFolderDoc(found, parts.hash, true);
+    } else {
+      blobUrlFor(found).then(function (url) { window.open(url, "_blank", "noopener"); },
+        function () { toast("Couldn\u2019t read " + found + "."); });
+    }
+  });
+
+  function readText(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(String(reader.result)); };
+      reader.onerror = function () { reject(reader.error); };
+      reader.readAsText(file);
+    });
+  }
+
+  function openFolderDoc(path, hash, push) {
+    getFolderFile(path).then(readText).then(function (text) {
+      currentDocPath = path;
+      docSelect.value = path;
+      if (push) {
+        try { history.pushState({ mdPath: path, hash: hash || "" }, ""); } catch (e) {}
+      }
+      renderMarkdown(text, path);
+      if (!scrollToAnchor(hash)) window.scrollTo(0, 0);
+      saveProgress();
+    });
+  }
+
+  window.addEventListener("popstate", function (e) {
+    var st = e.state;
+    if (st && st.mdPath && findInFolder(st.mdPath)) openFolderDoc(st.mdPath, st.hash, false);
+  });
+
+  // where the current document came from, so "reload" can read it again
+  var fileHandle = null;  // FileSystemFileHandle (File System Access API)
+  var lastFile = null;    // File snapshot (file input / plain drop)
+  var dirHandle = null;   // FileSystemDirectoryHandle for folder mode
+
+  function clearFolder() {
+    revokeBlobUrls();
+    currentRecentId = null;
+    fileHandle = null;
+    lastFile = null;
+    dirHandle = null;
+    folderFiles = null;
+    folderLower = {};
+    currentDocPath = "";
+    docSelect.innerHTML = "";
+    document.body.classList.remove("folder-mode");
+  }
+
+  // entries: [{path: "sub/file.md", file: File | FileSystemFileHandle}] with paths relative to the folder root.
+  // preferPath reopens that document (used by reload); returns a promise that settles once rendered.
+  function loadFolder(entries, folderName, handle, preferPath) {
+    clearFolder();
+    dirHandle = handle || null;
+    folderFiles = {};
+    entries.forEach(function (en) {
+      if (/(^|\/)(\.git|node_modules)(\/|$)/.test(en.path)) return;
+      folderFiles[en.path] = en.file;
+      folderLower[en.path.toLowerCase()] = en.path;
+    });
+    var docs = Object.keys(folderFiles).filter(function (p) { return MD_EXT.test(p); }).sort(function (a, b) {
+      var da = a.split("/").length, db = b.split("/").length;
+      return da !== db ? da - db : a.localeCompare(b);
+    });
+    if (!docs.length) {
+      clearFolder();
+      toast("No markdown files found in \u201c" + folderName + "\u201d.");
+      return Promise.resolve();
+    }
+    docs.forEach(function (p) {
+      var opt = document.createElement("option");
+      opt.value = p;
+      opt.textContent = p;
+      docSelect.appendChild(opt);
+    });
+    document.body.classList.add("folder-mode");
+    var start = (preferPath && findInFolder(preferPath)) ||
+      docs.filter(function (p) { return /^(readme|index)\.[a-z]+$/i.test(p); })[0] || docs[0];
+    return getFolderFile(start).then(readText).then(function (text) {
+      currentDocPath = start;
+      docSelect.value = start;
+      try { history.replaceState({ mdPath: start, hash: "" }, ""); } catch (e) {}
+      window.scrollTo(0, 0);
+      return renderMarkdown(text, start);
+    });
+  }
+
+  // walk a directory handle (File System Access API); keeps handles so files are read fresh on demand
+  function readDirHandle(dir, prefix) {
+    var out = [];
+    var it = dir.values();
+    function step() {
+      return it.next().then(function (r) {
+        if (r.done) return out;
+        var h = r.value;
+        if (h.kind === "directory") {
+          if (h.name === ".git" || h.name === "node_modules") return step();
+          return readDirHandle(h, prefix + h.name + "/").then(function (sub) { out = out.concat(sub); return step(); });
+        }
+        out.push({ path: prefix + h.name, file: h });
+        return step();
+      });
+    }
+    return step();
+  }
+
+  // recentEntry: reopening from the recent list (resume its document + scroll) instead of recording a new entry
+  function openDirHandle(h, recentEntry) {
+    return readDirHandle(h, "").then(function (entries) {
+      return loadFolder(entries, h.name, h, recentEntry && recentEntry.docPath);
+    }).then(function () {
+      if (!dirHandle) return;  // folder had no markdown files
+      if (recentEntry) {
+        if (currentDocPath === recentEntry.docPath) window.scrollTo(0, recentEntry.scrollY || 0);
+        resumeRecent(recentEntry);
+      } else {
+        recordRecent({ kind: "folder", name: h.name, handle: h });
+      }
+    });
+  }
+
+  docSelect.addEventListener("change", function () {
+    if (findInFolder(docSelect.value)) openFolderDoc(docSelect.value, "", true);
+  });
+
+  // walk a dropped directory (webkitGetAsEntry API)
+  function walkEntry(entry, prefix) {
+    if (entry.isFile) {
+      return new Promise(function (resolve) {
+        entry.file(function (f) { resolve([{ path: prefix + entry.name, file: f }]); }, function () { resolve([]); });
+      });
+    }
+    if (!entry.isDirectory || entry.name === ".git" || entry.name === "node_modules") return Promise.resolve([]);
+    var reader = entry.createReader();
+    var all = [];
+    return new Promise(function (resolve) {
+      (function readBatch() {
+        reader.readEntries(function (batch) {
+          if (!batch.length) {
+            Promise.all(all.map(function (child) { return walkEntry(child, prefix + entry.name + "/"); }))
+              .then(function (lists) { resolve([].concat.apply([], lists)); });
+            return;
+          }
+          all = all.concat(Array.prototype.slice.call(batch));
+          readBatch();
+        }, function () { resolve([]); });
+      })();
+    });
+  }
+
+  function stripRoot(entries) {
+    return entries.map(function (en) {
+      return { path: en.path.slice(en.path.indexOf("/") + 1), file: en.file };
+    });
+  }
+
+  // ---------- loading files ----------
+  function loadFile(file, handle, recentEntry) {
+    if (!file) return Promise.resolve();
+    var text;
+    return readText(file).then(function (t) {
+      text = t;
+      clearFolder();
+      fileHandle = handle || null;
+      lastFile = file;
+      window.scrollTo(0, 0);
+      return renderMarkdown(text, file.name);
+    }).then(function () {
+      if (recentEntry) {
+        window.scrollTo(0, recentEntry.scrollY || 0);
+        resumeRecent(recentEntry);
+      } else if (handle) {
+        recordRecent({ kind: "file", name: file.name, handle: handle });
+      } else {
+        // no live handle (e.g. Firefox, or a plain drop): keep a saved copy of the text instead
+        recordRecent({ kind: "copy", name: file.name, text: text });
+      }
+    });
+  }
+
+  function isAbort(err) { return err && err.name === "AbortError"; }
+
+  var folderInput = document.getElementById("folderInput");
+  // Chrome/Edge: pickers return live handles (reload sees edits); other browsers fall back to <input>
+  function pickFile() {
+    if (!window.showOpenFilePicker) { fileInput.click(); return; }
+    window.showOpenFilePicker({
+      types: [{ description: "Markdown", accept: { "text/plain": [".md", ".markdown", ".mdown", ".mkd", ".txt"] } }]
+    }).then(function (hs) {
+      return hs[0].getFile().then(function (f) { loadFile(f, hs[0]); });
+    }).catch(function (err) { if (!isAbort(err)) fileInput.click(); });
+  }
+  function pickFolder() {
+    if (!window.showDirectoryPicker) { folderInput.click(); return; }
+    window.showDirectoryPicker().then(openDirHandle).catch(function (err) { if (!isAbort(err)) folderInput.click(); });
+  }
+
+  document.getElementById("openFolderBtn").addEventListener("click", pickFolder);
+  document.getElementById("emptyFolderBtn").addEventListener("click", pickFolder);
+  folderInput.addEventListener("change", function () {
+    var files = Array.prototype.slice.call(folderInput.files || []);
+    if (!files.length) return;
+    var rootName = (files[0].webkitRelativePath || "").split("/")[0];
+    loadFolder(stripRoot(files.map(function (f) { return { path: f.webkitRelativePath || f.name, file: f }; })), rootName);
+    folderInput.value = "";
+  });
+
+  document.getElementById("openBtn").addEventListener("click", pickFile);
+  document.getElementById("emptyOpenBtn").addEventListener("click", pickFile);
+  fileInput.addEventListener("change", function (e) {
+    if (e.target.files && e.target.files[0]) loadFile(e.target.files[0]);
+  });
+
+  ["dragenter", "dragover"].forEach(function (evt) {
+    window.addEventListener(evt, function (e) {
+      if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") !== -1) {
+        e.preventDefault();
+        dropOverlay.classList.add("active");
+      }
+    });
+  });
+  ["dragleave", "drop"].forEach(function (evt) {
+    window.addEventListener(evt, function (e) {
+      if (evt === "dragleave" && e.target !== document.documentElement && e.relatedTarget) return;
+      dropOverlay.classList.remove("active");
+    });
+  });
+  window.addEventListener("drop", function (e) {
+    e.preventDefault();
+    var dt = e.dataTransfer;
+    if (!dt) return;
+    var item = dt.items && dt.items[0];
+    // both getters must be called synchronously, before the drop event ends
+    var handlePromise = item && item.kind === "file" && item.getAsFileSystemHandle ? item.getAsFileSystemHandle() : null;
+    var entry = item && item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+    var file = dt.files && dt.files[0];
+    function fallback() {
+      if (entry && entry.isDirectory) {
+        walkEntry(entry, "").then(function (entries) { loadFolder(stripRoot(entries), entry.name); });
+      } else if (file) {
+        loadFile(file);
+      }
+    }
+    if (!handlePromise) { fallback(); return; }
+    handlePromise.then(function (h) {
+      if (!h) fallback();
+      else if (h.kind === "directory") openDirHandle(h);
+      else h.getFile().then(function (f) { loadFile(f, h); });
+    }).catch(fallback);
+  });
+
+  // ---------- recent files & folders ----------
+  // Stored in IndexedDB: FileSystemHandles are structured-cloneable there (Chrome/Edge), so an entry can
+  // reopen the live file/folder after the browser re-asks for permission. Entries without a handle keep
+  // a copy of the text. Each entry also remembers the folder document and scroll position last viewed.
+  var RECENT_MAX = 12;
+  var RECENT_COPY_MAX = 5 * 1024 * 1024;
+  var currentRecentId = null;
+  var recentCache = [];
+  var recentDbPromise = null;
+  var recentMenu = document.getElementById("recentMenu");
+  var recentBtn = document.getElementById("recentBtn");
+
+  function recentDb() {
+    if (!recentDbPromise) {
+      recentDbPromise = new Promise(function (resolve, reject) {
+        if (!window.indexedDB) { reject(new Error("no IndexedDB")); return; }
+        var req = indexedDB.open("md-viewer", 1);
+        req.onupgradeneeded = function () { req.result.createObjectStore("recent", { keyPath: "id" }); };
+        req.onsuccess = function () { resolve(req.result); };
+        req.onerror = function () { reject(req.error); };
+      });
+    }
+    return recentDbPromise;
+  }
+
+  function recentTx(mode, fn) {
+    return recentDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction("recent", mode);
+        var req = fn(tx.objectStore("recent"));
+        tx.oncomplete = function () { resolve(req ? req.result : undefined); };
+        tx.onerror = function () { reject(tx.error); };
+        tx.onabort = function () { reject(tx.error); };
+      });
+    });
+  }
+
+  function listRecent() {
+    return recentTx("readonly", function (st) { return st.getAll(); }).then(function (all) {
+      return (all || []).sort(function (a, b) { return b.openedAt - a.openedAt; });
+    });
+  }
+
+  function putRecent(entry) { return recentTx("readwrite", function (st) { return st.put(entry); }); }
+  function deleteRecent(id) { return recentTx("readwrite", function (st) { return st.delete(id); }); }
+
+  // resolves to the existing entry pointing at the same file/folder, if any
+  function findSameRecent(all, info) {
+    var candidates = all.filter(function (en) { return en.kind === info.kind; });
+    if (info.kind === "copy") {
+      return Promise.resolve(candidates.filter(function (en) { return en.name === info.name; })[0] || null);
+    }
+    var i = 0;
+    function next() {
+      if (i >= candidates.length) return Promise.resolve(null);
+      var en = candidates[i++];
+      if (!en.handle || !en.handle.isSameEntry) return next();
+      return en.handle.isSameEntry(info.handle).then(function (same) { return same ? en : next(); }, next);
+    }
+    return next();
+  }
+
+  function recordRecent(info) {
+    if (info.kind === "copy" && info.text.length > RECENT_COPY_MAX) return;
+    listRecent().then(function (all) {
+      return findSameRecent(all, info).then(function (dup) {
+        var entry = {
+          id: dup ? dup.id : Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+          kind: info.kind,
+          name: info.name,
+          handle: info.handle || null,
+          text: info.text || null,
+          docPath: currentDocPath,
+          scrollY: 0,
+          openedAt: Date.now()
+        };
+        return putRecent(entry).then(function () {
+          currentRecentId = entry.id;
+          var stale = all.filter(function (en) { return en.id !== entry.id; }).slice(RECENT_MAX - 1);
+          return Promise.all(stale.map(function (en) { return deleteRecent(en.id); }));
+        });
+      });
+    }).then(refreshRecentUi, function () {});  // storage unavailable (private window, blocked): just skip
+  }
+
+  function resumeRecent(entry) {
+    entry.openedAt = Date.now();
+    putRecent(entry).then(function () { currentRecentId = entry.id; refreshRecentUi(); }, function () {});
+  }
+
+  var progressTimer = null;
+  function saveProgress() {
+    clearTimeout(progressTimer);
+    progressTimer = setTimeout(function () {
+      var id = currentRecentId;
+      if (!id) return;
+      recentTx("readonly", function (st) { return st.get(id); }).then(function (entry) {
+        if (!entry || id !== currentRecentId) return;
+        entry.scrollY = Math.round(window.scrollY);
+        entry.docPath = currentDocPath;
+        return putRecent(entry);
+      }).catch(function () {});
+    }, 400);
+  }
+  window.addEventListener("scroll", saveProgress, { passive: true });
+
+  function timeAgo(t) {
+    var sec = (Date.now() - t) / 1000;
+    if (sec < 60) return "just now";
+    if (sec < 3600) return Math.floor(sec / 60) + " min ago";
+    if (sec < 86400) return Math.floor(sec / 3600) + " h ago";
+    if (sec < 7 * 86400) return Math.floor(sec / 86400) + " d ago";
+    return new Date(t).toLocaleDateString();
+  }
+
+  function fillRecentList(listEl) {
+    listEl.innerHTML = "";
+    recentCache.forEach(function (en) {
+      var li = document.createElement("li");
+      var open = document.createElement("button");
+      open.className = "recent-open";
+      open.title = en.kind === "copy" ? "saved copy from " + new Date(en.openedAt).toLocaleString() : "open " + en.name;
+      var kind = document.createElement("span");
+      kind.className = "recent-kind";
+      kind.textContent = en.kind === "copy" ? "copy" : en.kind;
+      var name = document.createElement("span");
+      name.className = "recent-name";
+      name.textContent = en.name;
+      var meta = document.createElement("span");
+      meta.className = "recent-meta";
+      meta.textContent = (en.kind === "folder" && en.docPath ? en.docPath + " \u00b7 " : "") + timeAgo(en.openedAt);
+      open.appendChild(kind);
+      open.appendChild(name);
+      open.appendChild(meta);
+      open.addEventListener("click", function () { closeRecentMenu(); openRecent(en); });
+      var remove = document.createElement("button");
+      remove.className = "recent-remove";
+      remove.title = "remove from list";
+      remove.setAttribute("aria-label", "remove " + en.name + " from list");
+      remove.textContent = "\u2715";
+      remove.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (currentRecentId === en.id) currentRecentId = null;
+        deleteRecent(en.id).then(refreshRecentUi, function () {});
+      });
+      li.appendChild(open);
+      li.appendChild(remove);
+      listEl.appendChild(li);
+    });
+  }
+
+  function refreshRecentUi() {
+    return listRecent().then(function (all) {
+      recentCache = all;
+      document.body.classList.toggle("has-recent", all.length > 0);
+      if (!all.length) closeRecentMenu();
+      fillRecentList(document.getElementById("recentMenuList"));
+      var emptyList = document.getElementById("recentList");  // only exists on the start screen
+      if (emptyList) fillRecentList(emptyList);
+    }, function () {
+      document.body.classList.remove("has-recent");
+    });
+  }
+
+  function ensureReadPermission(handle) {
+    if (!handle.queryPermission) return Promise.resolve();
+    return handle.queryPermission({ mode: "read" }).then(function (state) {
+      return state === "granted" ? state : handle.requestPermission({ mode: "read" });
+    }).then(function (state) {
+      if (state !== "granted") throw Object.assign(new Error("permission denied"), { name: "NotAllowedError" });
+    });
+  }
+
+  function openRecent(entry) {
+    if (entry.kind === "copy") {
+      clearFolder();
+      window.scrollTo(0, 0);
+      renderMarkdown(entry.text, entry.name + " (saved copy)").then(function () {
+        window.scrollTo(0, entry.scrollY || 0);
+        resumeRecent(entry);
+      });
+      return;
+    }
+    if (!entry.handle) { toast("This entry can\u2019t be reopened."); return; }
+    ensureReadPermission(entry.handle).then(function () {
+      if (entry.kind === "folder") return openDirHandle(entry.handle, entry);
+      return entry.handle.getFile().then(function (f) { return loadFile(f, entry.handle, entry); });
+    }).catch(function (err) {
+      if (err && err.name === "NotAllowedError") {
+        toast("Permission to read \u201c" + entry.name + "\u201d was not granted.");
+      } else if (err && err.name === "NotFoundError") {
+        toast("\u201c" + entry.name + "\u201d no longer exists (moved or deleted) \u2014 removed from the list.");
+        deleteRecent(entry.id).then(refreshRecentUi, function () {});
+      } else {
+        toast("Couldn\u2019t open \u201c" + entry.name + "\u201d.");
+      }
+    });
+  }
+
+  function closeRecentMenu() {
+    recentMenu.classList.remove("open");
+    recentBtn.setAttribute("aria-expanded", "false");
+  }
+  recentBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    if (recentMenu.classList.contains("open")) { closeRecentMenu(); return; }
+    refreshRecentUi().then(function () {
+      recentMenu.classList.add("open");
+      recentBtn.setAttribute("aria-expanded", "true");
+    });
+  });
+  document.addEventListener("click", function (e) {
+    if (recentMenu.classList.contains("open") && !recentMenu.contains(e.target)) closeRecentMenu();
+  });
+  document.getElementById("recentClear").addEventListener("click", function () {
+    currentRecentId = null;
+    recentTx("readwrite", function (st) { return st.clear(); }).then(refreshRecentUi, function () {});
+  });
+
+  // ---------- reload ----------
+  function reloadDoc() {
+    var y = window.scrollY;
+    var job;
+    if (dirHandle) {
+      // re-walk so added/removed files show up; handles read the latest content
+      job = readDirHandle(dirHandle, "").then(function (entries) {
+        return loadFolder(entries, dirHandle.name, dirHandle, currentDocPath);
+      });
+    } else if (folderFiles && currentDocPath) {
+      job = getFolderFile(currentDocPath).then(readText).then(function (text) {
+        revokeBlobUrls();
+        return renderMarkdown(text, currentDocPath);
+      });
+    } else if (fileHandle) {
+      job = fileHandle.getFile().then(function (f) {
+        lastFile = f;
+        return readText(f).then(function (text) { return renderMarkdown(text, f.name); });
+      });
+    } else if (lastFile) {
+      job = readText(lastFile).then(function (text) { return renderMarkdown(text, lastFile.name); });
+    } else if (lastMarkdown !== null) {
+      job = renderMarkdown(lastMarkdown, lastFilename);
+    } else {
+      return;
+    }
+    window.scrollTo(0, y);
+    Promise.resolve(job).then(function () {
+      window.scrollTo(0, y);  // again, once diagrams have their final height
+      toast("Reloaded.");
+    }, function () {
+      toast("Couldn\u2019t re-read the file \u2014 it probably changed on disk, which this browser blocks for files opened this way. Open it again.");
+    });
+  }
+  document.getElementById("reloadBtn").addEventListener("click", reloadDoc);
+
+  // ---------- paste panel ----------
+  document.getElementById("pasteBtn").addEventListener("click", function () {
+    pasteTextarea.value = lastMarkdown || "";
+    pastePanel.classList.add("open");
+    pasteTextarea.focus();
+  });
+  document.getElementById("pasteCancel").addEventListener("click", function () {
+    pastePanel.classList.remove("open");
+  });
+  document.getElementById("pasteRender").addEventListener("click", function () {
+    var text = pasteTextarea.value;
+    if (!text.trim()) return;
+    clearFolder();
+    renderMarkdown(text, "pasted markdown");
+    pastePanel.classList.remove("open");
+  });
+  pastePanel.addEventListener("click", function (e) {
+    if (e.target === pastePanel) pastePanel.classList.remove("open");
+  });
+
+  // ---------- example ----------
+  var EXAMPLE_MD = [
+    "# Project overview",
+    "",
+    "A short example document to try **zooming** and **panning** the diagrams below.",
+    "",
+    "## Architecture",
+    "",
+    "```mermaid",
+    "flowchart LR",
+    "  user[User] --> gateway[API gateway]",
+    "  gateway --> auth[Auth service]",
+    "  gateway --> orders[Orders service]",
+    "  orders --> db[(Orders DB)]",
+    "  auth --> cache[(Session cache)]",
+    "  orders -.async event.-> queue{{Event queue}}",
+    "  queue --> notifier[Notification worker]",
+    "```",
+    "",
+    "Ctrl + scroll over a diagram to zoom, drag to pan, click **⧉** for a popup view, or **⤢** for full screen.",
+    "",
+    "## Request sequence",
+    "",
+    "```mermaid",
+    "sequenceDiagram",
+    "  participant U as User",
+    "  participant G as Gateway",
+    "  participant O as Orders",
+    "  U->>G: POST /orders",
+    "  G->>O: create order",
+    "  O-->>G: 201 created",
+    "  G-->>U: order confirmation",
+    "  O->>O: emit order.created",
+    "```",
+    "",
+    "## Notes",
+    "",
+    "- Diagrams render with [Mermaid](https://mermaid.js.org)",
+    "- Regular markdown works as usual: tables, `code`, lists, and blockquotes.",
+    "",
+    "> Drop your own `.md` file in anywhere on the page to replace this example.",
+    "",
+    "| Feature | Supported |",
+    "| --- | --- |",
+    "| Flowcharts | yes |",
+    "| Sequence diagrams | yes |",
+    "| Zoom / pan | yes |",
+    ""
+  ].join("\n");
+
+  document.getElementById("emptyExampleBtn").addEventListener("click", function () {
+    clearFolder();
+    renderMarkdown(EXAMPLE_MD, "example.md");
+  });
+
+  // ---------- init ----------
+  syncBarHeight();
+  applyTheme(currentTheme);
+  refreshRecentUi();
+})();
+</script>
+</body>
+</html>
