@@ -23,6 +23,7 @@ An internet connection is needed on first load: the page gets its Markdown and d
 
 - **Table of contents**: documents with two or more headings get a contents list. On wide screens it's a sidebar on the left; on narrow screens it's a panel that slides out. The **☰ contents** button shows or hides it. The section you're reading is highlighted, and clicking an entry jumps straight to it.
 - **Top bar**: hides as you scroll down and comes back as soon as you scroll up.
+- **Width**: text is shown in a comfortable reading column by default. Click **↔** (next to **◐**) to use the full width of the window, and again to go back. Diagrams resize to fit, and your choice is remembered.
 - **Theme**: light by default. Click **◐** to switch between light and dark; your choice is remembered.
 - **Links**: links to headings in the same document (`[Setup](#setup)`) jump to that heading, using the same heading anchors as GitHub. Links to websites open in a new tab.
 

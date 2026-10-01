@@ -171,6 +171,8 @@
     color: var(--paper-raised);
   }
   button.ui-btn.icon-only { padding: 0.4rem 0.5rem; }
+  #widthBtn { font-size: 15px; padding-top: 0.3rem; padding-bottom: 0.3rem; }
+  button.ui-btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
 
   /* split button: main action + dropdown of other ways to open */
   .split { position: relative; display: inline-flex; }
@@ -225,6 +227,7 @@
     max-width: 700px;
     min-width: 0;
   }
+  body.full-width #content { max-width: none; }
 
   /* table of contents */
   #tocBtn { display: none; }
@@ -725,6 +728,7 @@
       <button role="menuitem" id="pasteBtn">paste text<span class="hint">paste markdown to render</span></button>
     </div>
   </div>
+  <button class="ui-btn icon-only" id="widthBtn" title="toggle full width" aria-label="toggle full width" aria-pressed="false">↔</button>
   <button class="ui-btn icon-only" id="themeBtn" title="toggle theme" aria-label="toggle theme">◐</button>
   <input type="file" id="fileInput" accept=".md,.markdown,.txt">
   <input type="file" id="folderInput" webkitdirectory multiple>
@@ -820,6 +824,20 @@
   document.getElementById("themeBtn").addEventListener("click", function () {
     applyTheme(currentTheme === "dark" ? "light" : "dark");
   });
+
+  // ---------- content width: reading column (700px) or full page ----------
+  var widthBtn = document.getElementById("widthBtn");
+  function applyFullWidth(on) {
+    document.body.classList.toggle("full-width", on);
+    widthBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    widthBtn.title = on ? "use reading width" : "use full width";
+    try { localStorage.setItem("md-viewer-full-width", on ? "1" : "0"); } catch (e) {}
+    Object.keys(diagramStates).forEach(fitDiagram);
+  }
+  widthBtn.addEventListener("click", function () {
+    applyFullWidth(!document.body.classList.contains("full-width"));
+  });
+  try { applyFullWidth(localStorage.getItem("md-viewer-full-width") === "1"); } catch (e) { applyFullWidth(false); }
 
   // ---------- markdown rendering ----------
   function escapeHtml(str) {
