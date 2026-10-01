@@ -1150,6 +1150,8 @@
     }
     filenameLabel.textContent = filename || "";
     filenameLabel.title = filename || "";
+    // tab title: just the file name ("docs/guide.md" -> "guide.md")
+    document.title = filename ? filename.split("/").pop() : "Markdown Viewer";
     document.body.classList.add("has-doc");
     return diagramsDone;
   }
