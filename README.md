@@ -8,12 +8,12 @@ No install, no build, no server: download one file and open it in your browser.
 
 1. Download [`Markdown_Mermaid_Viewer.html`](Markdown_Mermaid_Viewer.html).
 2. Open it in your browser (double-click it, or drag it onto a browser window).
-3. Open a document:
-   - **open file**: a single `.md` file.
+3. Open a document. The **open folder** button in the top bar opens a folder; its **▾** arrow lists the other ways to open:
    - **open folder**: a whole folder of docs, which makes relative links and images work (see [Folders](#folders-relative-links-and-images)).
-   - **Drag and drop** a file or a folder anywhere on the page.
+   - **open file**: a single `.md` file.
    - **paste text**: paste Markdown straight in.
-   - **load example**: a sample document to try the features.
+
+   You can also **drag and drop** a file or a folder anywhere on the page, or use **load example** on the start page to try the features.
 
 Chrome or Edge is recommended. The viewer works in other browsers too, with a few limits listed under [Browser support](#browser-support).
 
@@ -87,7 +87,7 @@ In Chrome and Edge, entries reopen the actual file or folder, so you always see 
 
 | Key | Action |
 | --- | --- |
-| **Esc** | Close the popup, full screen, the contents panel, the recent menu or the paste panel. |
+| **Esc** | Close the popup, full screen, the contents panel, the open or recent menu, or the paste panel. |
 | **Ctrl / ⌘ + scroll** | Zoom a diagram. |
 
 ## Browser support

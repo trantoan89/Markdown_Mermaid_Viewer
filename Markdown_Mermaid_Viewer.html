@@ -172,6 +172,47 @@
   }
   button.ui-btn.icon-only { padding: 0.4rem 0.5rem; }
 
+  /* split button: main action + dropdown of other ways to open */
+  .split { position: relative; display: inline-flex; }
+  .split .split-main { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .split .split-caret {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    box-shadow: inset 1px 0 0 color-mix(in srgb, var(--paper-raised) 45%, transparent);
+    padding: 0.4rem 0.45rem;
+  }
+  .split-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 30;
+    min-width: 230px;
+    flex-direction: column;
+    padding: 0.3rem;
+    background: var(--paper-raised);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.18);
+  }
+  .split-menu.open { display: flex; }
+  .split-menu button {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    text-align: left;
+    padding: 0.5rem 0.65rem;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  .split-menu button:hover, .split-menu button:focus-visible { background: var(--accent-soft); outline: none; }
+  .split-menu .hint { font-size: 10.5px; color: var(--ink-faint); }
+
   main {
     flex: 1 1 auto;
     display: flex;
@@ -675,9 +716,15 @@
   <button class="ui-btn icon-only" id="reloadBtn" title="reload from disk" aria-label="reload from disk">↻</button>
   <div class="spacer"></div>
   <button class="ui-btn" id="recentBtn" aria-haspopup="true" aria-expanded="false" title="recently opened">recent ▾</button>
-  <button class="ui-btn" id="pasteBtn">paste text</button>
-  <button class="ui-btn" id="openFolderBtn" title="open a folder so relative links and images work">open folder</button>
-  <button class="ui-btn primary" id="openBtn">open file</button>
+  <div class="split" id="openSplit">
+    <button class="ui-btn primary split-main" id="openFolderBtn" title="open a folder so relative links and images work">open folder</button>
+    <button class="ui-btn primary split-caret" id="openMenuBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="openMenu" aria-label="more ways to open" title="more ways to open">▾</button>
+    <div class="split-menu" id="openMenu" role="menu">
+      <button role="menuitem" id="menuFolderBtn">open folder<span class="hint">relative links and images work</span></button>
+      <button role="menuitem" id="openBtn">open file<span class="hint">a single .md file</span></button>
+      <button role="menuitem" id="pasteBtn">paste text<span class="hint">paste markdown to render</span></button>
+    </div>
+  </div>
   <button class="ui-btn icon-only" id="themeBtn" title="toggle theme" aria-label="toggle theme">◐</button>
   <input type="file" id="fileInput" accept=".md,.markdown,.txt">
   <input type="file" id="folderInput" webkitdirectory multiple>
@@ -1195,6 +1242,7 @@
       if (pseudoFsId !== null) exitPseudoFullscreen();
       closePopup();
       closeRecentMenu();
+      closeOpenMenu();
       document.body.classList.remove("toc-open");
       if (pastePanel.classList.contains("open")) pastePanel.classList.remove("open");
     }
@@ -1519,6 +1567,36 @@
   }
 
   document.getElementById("openFolderBtn").addEventListener("click", pickFolder);
+  document.getElementById("menuFolderBtn").addEventListener("click", pickFolder);
+
+  var openMenu = document.getElementById("openMenu");
+  var openMenuBtn = document.getElementById("openMenuBtn");
+  function closeOpenMenu() {
+    openMenu.classList.remove("open");
+    openMenuBtn.setAttribute("aria-expanded", "false");
+  }
+  openMenuBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    if (openMenu.classList.contains("open")) { closeOpenMenu(); return; }
+    closeRecentMenu();
+    openMenu.classList.add("open");
+    openMenuBtn.setAttribute("aria-expanded", "true");
+    openMenu.querySelector("button").focus();
+  });
+  // items run their own handlers; the menu just closes afterwards
+  openMenu.addEventListener("click", function (e) {
+    if (e.target.closest("button")) closeOpenMenu();
+  });
+  openMenu.addEventListener("keydown", function (e) {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    var items = Array.prototype.slice.call(openMenu.querySelectorAll("button"));
+    var i = items.indexOf(document.activeElement);
+    items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
+  });
+  document.addEventListener("click", function (e) {
+    if (openMenu.classList.contains("open") && !document.getElementById("openSplit").contains(e.target)) closeOpenMenu();
+  });
   document.getElementById("emptyFolderBtn").addEventListener("click", pickFolder);
   folderInput.addEventListener("change", function () {
     var files = Array.prototype.slice.call(folderInput.files || []);
@@ -1778,6 +1856,7 @@
   recentBtn.addEventListener("click", function (e) {
     e.stopPropagation();
     if (recentMenu.classList.contains("open")) { closeRecentMenu(); return; }
+    closeOpenMenu();
     refreshRecentUi().then(function () {
       recentMenu.classList.add("open");
       recentBtn.setAttribute("aria-expanded", "true");
