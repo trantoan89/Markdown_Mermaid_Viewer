@@ -1227,6 +1227,9 @@
 
   function buildToc(docKey) {
     tocHeadings = Array.prototype.slice.call(content.querySelectorAll("h1, h2, h3, h4"));
+    // a lone h1 is the document title, not a section
+    var h1s = tocHeadings.filter(function (h) { return h.tagName === "H1"; });
+    if (h1s.length === 1) tocHeadings.splice(tocHeadings.indexOf(h1s[0]), 1);
     tocLinks = [];
     tocItems = [];
     toc.innerHTML = "";
